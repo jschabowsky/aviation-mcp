@@ -614,27 +614,3 @@ app.listen(port, '0.0.0.0', () => {
     console.error('Server error:', error);
     process.exit(1);
 });
-
-// Start the server
-//async function main() {
-//console.error("Starting Aviation Weather MCP Server with Streamable HTTP...");
-
-
-//try {
-// Start Streamable HTTP server on port 8000
-//const transport = new StreamableHTTPServerTransport({
-//port: 8000,
-//host: "0.0.0.0",
-//});
-
-
-//await server.connect(transport);
-//console.error(`Server running on http://0.0.0.0:8000`);
-//} catch (error) {
-//console.error("Error starting server:", error);
-//process.exit(1);
-//}
-//}
-
-
-//main();

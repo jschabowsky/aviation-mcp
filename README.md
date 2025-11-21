@@ -37,8 +37,8 @@ ALWAYS verify critical weather information through official channels.
 1. Clone this repository:
 
    ```bash
-   git clone https://github.com/yourusername/aviation-weather-mcp-server.git
-   cd aviation-weather-mcp-server
+   git clone https://github.com/jschabowsky/aviation-mcp.git
+   cd aviation-mcp
    ```
 
 2. Install dependencies:
@@ -59,30 +59,7 @@ ALWAYS verify critical weather information through official channels.
    npm start
    ```
 
-## Using with Claude for Desktop
 
-To use this server with Claude for Desktop:
-
-1. Edit your Claude for Desktop configuration file:
-   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-
-2. Add the server to the configuration:
-
-   ```json
-   {
-     "mcpServers": {
-       "aviation-weather": {
-         "command": "node",
-         "args": [
-           "/absolute/path/to/aviation-weather-mcp-server/build/index.js"
-         ]
-       }
-     }
-   }
-   ```
-
-3. Restart Claude for Desktop
 
 ## Example Queries
 
@@ -92,6 +69,74 @@ Once connected to Claude, you can ask questions like:
 - "Is there a TAF available for KORD?"
 - "I'm planning to fly from KBOS to KPHL tomorrow. What's the weather looking like?"
 - "Are there any PIREPs near KDEN?"
+
+
+## Deploying to AWS Bedrock Agent Core
+### Docker Deployment
+
+1. Create ECR Repository
+```
+aws ecr create-repository --repository-name mcp-server --region us-east-1
+```
+2. Build and Push Image to ECR
+```
+# Get login token
+aws ecr get-login-password --region us-east-1 | \
+  docker login --username AWS --password-stdin [account-id].dkr.ecr.us-east-1.amazonaws.com
+
+docker buildx --platform linux/arm64 \
+  -t [account-id].dkr.ecr.us-east-1.amazonaws.com/aviation-mcp:latest --push .
+```
+
+3. Deploy to Bedrock AgentCore
+
+    - Go to AWS Console → Amazon Bedrock AgentCore → Agent Runtime → Host Agent
+      - Provide Name: aviation-mcp
+      - Choose ECR Container
+        - Image URI: [account-id].dkr.ecr.us-east-1.amazonaws.com/aviation-mcp:latest
+    - Inbound Auth:
+      - Choose MCP as the protocol
+      - Choose: Use JSON Web Tokens (JWT)
+    - Host Agent
+
+
+4. Construct the Encoded ARN MCP URL
+Under the "View invocation code", locate the "agentRuntimeArn" variable and copy the value. This is the Agent ARN. In order to consturct the URL you need to URL encode the ARN with the following command
+
+```
+agent_arn=<value you copied>
+echo $agent_arn | sed 's/:/%3A/g; s/\//%2F/g'
+```
+The output of the above provides you with an encoded_arn you can use below in order to have the full URL to invoke the hosted MCP agent
+```
+https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{encoded_arn}/invocations?qualifier=DEFAULT
+```
+
+5. Test the Deployed MCP Server
+- Use the MCP url with [MCP inspector](https://github.com/modelcontextprotocol/inspector).
+- Use a CURL command if security issues prevent you from using inspector. The following example showcases if you setup agent core to use JWT token based authentication: 
+```bash
+curl -i \
+  -X POST \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "1",
+    "method": "tools/call",
+    "params": {
+      "name": "get-metar",
+      "arguments": {
+        "airport": "KSLC"
+      },
+      "_meta": {
+        "progressToken": 0
+      }
+    }
+  }' \
+  "https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{encoded_arn}/invocations?qualifier=DEFAULT"
+```
 
 ## Development
 
